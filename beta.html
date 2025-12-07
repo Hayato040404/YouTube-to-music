@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Immersive Music Player</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Immersive Music Player — Favorites Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;600;700;800&family=Inter:wght@400;600&display=swap');
 
@@ -19,25 +19,15 @@
             font-family: 'SF Pro Display', 'Inter', sans-serif;
             background-color: #000;
             overflow: hidden;
-            /* iOS Safariのバウンススクロール防止 */
             overscroll-behavior: none;
         }
 
-        #bg-layer {
-            transition: opacity 1s ease;
-        }
+        #bg-layer { transition: opacity 1s ease; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* 歌詞スタイル */
         .lyric-line {
-            transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transition: all 0.5s cubic-bezier(0.2,0.8,0.2,1);
             transform-origin: left center;
             opacity: 0.4;
             transform: scale(var(--inactive-scale));
@@ -45,103 +35,45 @@
             cursor: pointer;
             padding: 10px 0;
             border-radius: 8px;
-            /* モバイルでのタップ誤反応防止 */
             -webkit-tap-highlight-color: transparent;
         }
-
-        .lyric-line:active {
-            background: rgba(255,255,255,0.1);
-        }
-
+        .lyric-line:active { background: rgba(255,255,255,0.1); }
         .lyric-line.active {
-            opacity: 1;
-            transform: scale(var(--active-scale));
-            filter: blur(0);
-            text-shadow: 0 0 20px rgba(255,255,255,0.5);
-            color: #ffffff;
+            opacity:1; transform: scale(var(--active-scale)); filter: blur(0);
+            text-shadow: 0 0 20px rgba(255,255,255,0.5); color: #fff;
         }
 
-        /* YouTube Player Mini View (左上極小) */
         .yt-mini-player {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            width: 100px; /* 必要最小限のサイズ */
-            height: 56px;
-            border-radius: 8px;
-            overflow: hidden;
-            z-index: 40;
-            opacity: 0.3; /* 半透明で目立たなくする */
-            border: 1px solid rgba(255,255,255,0.2);
-            transition: all 0.3s;
-            pointer-events: auto;
+            position: fixed; top:10px; left:10px; width:100px; height:56px;
+            border-radius:8px; overflow:hidden; z-index:40; opacity:0.3;
+            border:1px solid rgba(255,255,255,0.2); transition: all .3s; pointer-events:auto;
         }
-        /* ホバー時や操作時ははっきり表示 */
         .yt-mini-player:hover, .yt-mini-player:active {
-            opacity: 1;
-            width: 200px;
-            height: 113px;
-            transform: scale(1.05);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            opacity:1; width:200px; height:113px; transform: scale(1.05); box-shadow:0 10px 30px rgba(0,0,0,0.8);
         }
 
-        /* 歌詞エリアのマスク（上下フェード） */
         .lyrics-mask {
             mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
             -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
         }
 
-        /* フルスクリーンモード時のスタイル調整 */
-        .fullscreen-lyrics .player-section {
-            display: none !important;
-        }
-        .fullscreen-lyrics .lyrics-section {
-            height: 100vh !important;
-            padding-top: 80px; /* 上部の余裕 */
-        }
+        .fullscreen-lyrics .player-section { display:none !important; }
+        .fullscreen-lyrics .lyrics-section { height:100vh !important; padding-top:80px; }
         .fullscreen-lyrics .lyrics-mask {
-            /* フルスクリーン時はマスクを少し弱めて広さを強調 */
             mask-image: linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%);
             -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%);
         }
 
-        /* Range Slider */
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 14px;
-            width: 14px;
-            border-radius: 50%;
-            background: #fff;
-            margin-top: -5px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 2px;
-        }
+        input[type=range] { -webkit-appearance:none; background:transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; height:14px; width:14px; border-radius:50%; background:#fff; margin-top:-5px; box-shadow:0 2px 4px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width:100%; height:4px; background: rgba(255,255,255,0.3); border-radius:2px; }
 
         /* Favorites panel */
         .favorites-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 360px;
-            max-width: 92%;
-            height: 100vh;
-            background: linear-gradient(180deg, #0b0b0b, #111111);
-            z-index: 80;
-            box-shadow: -30px 0 60px rgba(0,0,0,0.6);
-            transform: translateX(110%);
-            transition: transform 0.32s cubic-bezier(.2,.9,.3,1);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            position: fixed; top:0; right:0; width:360px; max-width:92%; height:100vh;
+            background: linear-gradient(180deg,#0b0b0b,#111111); z-index:80;
+            box-shadow: -30px 0 60px rgba(0,0,0,0.6); transform: translateX(110%);
+            transition: transform .32s cubic-bezier(.2,.9,.3,1); display:flex; flex-direction:column; overflow:hidden;
         }
         .favorites-panel.open { transform: translateX(0%); }
         .fav-item { display:flex; gap:12px; align-items:center; padding:12px; border-radius:10px; cursor:pointer; }
@@ -151,39 +83,34 @@
         .fav-title { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .fav-artist { font-size:12px; color:rgba(255,255,255,0.6); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .fav-actions { display:flex; gap:8px; align-items:center; margin-left:8px; }
-
-        /* small helper */
         .btn-ghost { background: rgba(255,255,255,0.03); padding:8px; border-radius:999px; border:1px solid rgba(255,255,255,0.04); }
+
     </style>
 </head>
 <body class="text-white h-screen w-screen relative overflow-hidden">
 
-    <!-- 背景 (動的) -->
+    <!-- 背景 -->
     <div id="bg-layer" class="absolute inset-0 z-0">
-        <img id="bg-image" src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop" class="w-full h-full object-cover blur-[60px] opacity-50 brightness-50 scale-110">
+        <img id="bg-image" src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop" class="w-full h-full object-cover blur-[60px] opacity-50 brightness-50 scale-110" />
         <div class="absolute inset-0 bg-black/40"></div>
     </div>
 
-    <!-- ミニYouTubeプレイヤー (左上) -->
+    <!-- ミニYouTubeプレイヤー -->
     <div id="yt-container" class="yt-mini-player">
         <div id="youtube-player"></div>
-        <!-- タップガード（クリック透過させない） -->
         <div class="absolute inset-0 border-2 border-white/10 rounded-lg pointer-events-none"></div>
     </div>
 
-    <!-- ヘッダーボタン類 -->
+    <!-- ヘッダ -->
     <div class="absolute top-0 right-0 p-6 z-50 flex gap-4">
-        <!-- 歌詞モード切替ボタン (モバイルのみ表示) -->
         <button id="btn-toggle-lyrics" onclick="toggleLyricsMode()" class="md:hidden bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5">
             <i class="fas fa-expand-alt"></i>
         </button>
 
-        <!-- 検索ボタン -->
         <button onclick="openModal()" class="bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5">
             <i class="fas fa-search"></i>
         </button>
 
-        <!-- Favorites toggle -->
         <button id="btn-open-favs" class="bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5">
             <i class="fas fa-star"></i>
         </button>
@@ -204,7 +131,7 @@
         </div>
 
         <div id="fav-list" class="overflow-y-auto p-3 space-y-2">
-            <!-- favorite items go here -->
+            <!-- favorite items -->
         </div>
 
         <div class="p-3 border-t border-white/5 flex gap-2">
@@ -212,25 +139,21 @@
             <button id="btn-add-current" class="flex-1 bg-white text-black py-2 rounded-xl font-bold">Add Current</button>
         </div>
 
-        <!-- hidden file input for import -->
         <input id="fav-import-file" type="file" accept="application/json" style="display:none" />
     </div>
 
-    <!-- メインレイアウト -->
+    <!-- メイン -->
     <div id="main-layout" class="relative z-10 w-full h-full flex flex-col md:flex-row p-6 gap-6 max-w-7xl mx-auto items-center transition-all duration-500">
-        
-        <!-- 左側: プレイヤーセクション -->
+
+        <!-- 左プレイヤー -->
         <div id="player-section" class="player-section flex-1 w-full max-w-md flex flex-col justify-center space-y-6 min-h-[45vh] md:min-h-0 transition-all duration-500">
-            <!-- アルバムアート -->
             <div class="aspect-square w-full max-w-[300px] md:max-w-[350px] mx-auto relative group shadow-2xl rounded-2xl overflow-hidden">
-                <img id="album-art" src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop" class="w-full h-full object-cover transition-transform duration-700 hover:scale-105">
-                <!-- favorite (heart) -->
+                <img id="album-art" src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop" class="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
                 <button id="btn-favorite" class="absolute top-3 right-3 bg-white/5 p-2 rounded-full text-white/80 border border-white/5 hover:bg-white/10 transition">
                     <i id="heart-icon" class="far fa-heart"></i>
                 </button>
             </div>
 
-            <!-- 曲情報 -->
             <div class="text-center md:text-left space-y-1 px-2 flex items-center justify-center md:justify-start gap-3">
                 <div>
                     <h1 id="song-title" class="text-2xl md:text-3xl font-bold truncate tracking-tight">Music Player</h1>
@@ -238,18 +161,15 @@
                 </div>
             </div>
 
-            <!-- コントロール -->
             <div class="w-full space-y-4 px-2">
-                <!-- シークバー -->
                 <div>
-                    <input id="progress-bar" type="range" value="0" min="0" max="100" class="w-full">
+                    <input id="progress-bar" type="range" value="0" min="0" max="100" class="w-full" />
                     <div class="flex justify-between text-[10px] font-medium text-white/40 font-mono mt-1">
                         <span id="current-time">0:00</span>
                         <span id="duration">0:00</span>
                     </div>
                 </div>
 
-                <!-- ボタン群 -->
                 <div class="flex items-center justify-center md:justify-start gap-8">
                     <button id="btn-prev" class="text-white/50 hover:text-white transition p-2"><i class="fas fa-backward-step fa-xl"></i></button>
                     <button id="btn-play" class="text-white hover:scale-105 transition transform p-2">
@@ -260,7 +180,7 @@
             </div>
         </div>
 
-        <!-- 右側: 歌詞セクション -->
+        <!-- 右歌詞 -->
         <div id="lyrics-section" class="lyrics-section flex-1 w-full h-[40vh] md:h-[85vh] lyrics-mask relative transition-all duration-500">
             <div id="lyrics-container" class="w-full h-full overflow-y-auto no-scrollbar scroll-smooth py-[50%] md:py-[40vh] px-4 text-left">
                 <div class="text-center text-white/30 text-xl font-bold mt-10">
@@ -268,41 +188,40 @@
                     Lyrics will sync here
                 </div>
             </div>
-            
-            <!-- 歌詞モード時の簡易コントローラー (下部固定) -->
+
             <div id="lyrics-controls" class="hidden md:hidden absolute bottom-4 left-0 right-0 flex justify-center items-center gap-6 pb-6 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none">
-                 <div class="pointer-events-auto flex gap-6 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/5 shadow-2xl">
+                <div class="pointer-events-auto flex gap-6 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/5 shadow-2xl">
                     <button onclick="player.seekTo(player.getCurrentTime()-10, true)" class="text-white/70"><i class="fas fa-undo-alt"></i></button>
                     <button onclick="togglePlay()" class="text-white text-xl"><i id="mini-play-icon" class="fas fa-play"></i></button>
                     <button onclick="player.seekTo(player.getCurrentTime()+10, true)" class="text-white/70"><i class="fas fa-redo-alt"></i></button>
-                 </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- モーダル (検索/設定) -->
-    <div id="setup-modal" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 transition-opacity duration-300" style="display: flex;">
+    <!-- モーダル -->
+    <div id="setup-modal" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 transition-opacity duration-300" style="display:flex;">
         <div class="bg-[#1c1c1e] w-full max-w-lg p-6 md:p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
             <div class="relative z-10">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold">Play Music</h2>
                     <button onclick="closeModal()" class="text-white/50 hover:text-white p-2"><i class="fas fa-times text-xl"></i></button>
                 </div>
-                
+
                 <div class="space-y-5">
                     <div>
                         <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">YouTube URL</label>
                         <div class="flex items-center bg-white/10 rounded-xl px-4 py-3 border border-white/5 focus-within:border-blue-500 transition">
                             <i class="fab fa-youtube text-red-500 mr-3 text-lg"></i>
-                            <input id="input-url" type="text" placeholder="Paste link here..." class="bg-transparent border-none w-full text-white placeholder-white/30 focus:outline-none text-sm">
+                            <input id="input-url" type="text" placeholder="Paste link here..." class="bg-transparent border-none w-full text-white placeholder-white/30 focus:outline-none text-sm" />
                         </div>
                     </div>
-                    
+
                     <div>
                         <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Song & Artist</label>
                         <div class="flex items-center bg-white/10 rounded-xl px-4 py-3 border border-white/5 focus-within:border-blue-500 transition">
                             <i class="fas fa-search text-blue-400 mr-3 text-lg"></i>
-                            <input id="input-query" type="text" placeholder="e.g. Bling-Bang-Bang-Born" class="bg-transparent border-none w-full text-white placeholder-white/30 focus:outline-none text-sm">
+                            <input id="input-query" type="text" placeholder="e.g. Bling-Bang-Bang-Born" class="bg-transparent border-none w-full text-white placeholder-white/30 focus:outline-none text-sm" />
                         </div>
                     </div>
 
@@ -318,7 +237,7 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // --- State ---
+        // State
         let player;
         let isPlaying = false;
         let animationFrameId;
@@ -327,10 +246,10 @@
         let isDragging = false;
         let isLyricsMode = false;
 
-        // currentSong holds the currently loaded song metadata
+        // current song meta
         let currentSong = { videoId: null, title: "Music Player", artist: "Select a song", thumb: null };
 
-        // --- Elements ---
+        // Elements
         const els = {
             mainLayout: document.getElementById('main-layout'),
             playerSection: document.getElementById('player-section'),
@@ -364,28 +283,25 @@
             btnFavorite: document.getElementById('btn-favorite')
         };
 
-        // favorites storage key
+        // Favorites storage
         const FAV_KEY = 'imusic_favorites_v1';
         let favorites = [];
 
-        // --- Layout Switching (Mobile) ---
+        // Layout switching
         function toggleLyricsMode() {
             isLyricsMode = !isLyricsMode;
             const icon = els.toggleBtn.querySelector('i');
 
             if (isLyricsMode) {
-                // Activate Fullscreen Lyrics
                 document.body.classList.add('fullscreen-lyrics');
                 els.lyricsControls.classList.remove('hidden');
                 icon.classList.remove('fa-expand-alt');
                 icon.classList.add('fa-compress-alt');
-                // Scroll current line to center again after layout change
                 setTimeout(() => {
                     const activeLine = document.querySelector('.lyric-line.active');
-                    if(activeLine) scrollToActiveLine(activeLine);
+                    if (activeLine) scrollToActiveLine(activeLine);
                 }, 300);
             } else {
-                // Deactivate
                 document.body.classList.remove('fullscreen-lyrics');
                 els.lyricsControls.classList.add('hidden');
                 icon.classList.remove('fa-compress-alt');
@@ -393,7 +309,7 @@
             }
         }
 
-        // --- Modal ---
+        // Modal
         function openModal() {
             els.modal.style.display = 'flex';
             setTimeout(() => els.modal.style.opacity = '1', 10);
@@ -403,30 +319,15 @@
             setTimeout(() => els.modal.style.display = 'none', 300);
         }
 
-        // --- YouTube API ---
+        // YouTube API
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('youtube-player', {
-                height: '100%',
-                width: '100%',
-                videoId: '',
-                playerVars: {
-                    'playsinline': 1,
-                    'controls': 1,
-                    'disablekb': 1,
-                    'modestbranding': 1,
-                    'fs': 0
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange
-                }
+                height: '100%', width: '100%', videoId: '',
+                playerVars: { 'playsinline':1, 'controls':1, 'disablekb':1, 'modestbranding':1, 'fs':0 },
+                events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
             });
         }
-
-        function onPlayerReady(event) {
-            // Ready
-        }
-
+        function onPlayerReady(e) { /* ready */ }
         function onPlayerStateChange(event) {
             if (event.data == YT.PlayerState.PLAYING) {
                 isPlaying = true;
@@ -437,29 +338,21 @@
                 updatePlayIcons(false);
                 cancelAnimationFrame(animationFrameId);
             }
-            // update heart icon state
             updateHeartState();
         }
-
-        function togglePlay() {
-            if(!player) return;
-            if(isPlaying) player.pauseVideo();
-            else player.playVideo();
-        }
-
+        function togglePlay() { if(!player) return; if(isPlaying) player.pauseVideo(); else player.playVideo(); }
         function updatePlayIcons(playing) {
-            // Main button
             const mainIcon = els.playBtn.querySelector('i');
             if (playing) {
-                mainIcon.classList.replace('fa-play-circle', 'fa-pause-circle');
-                els.miniPlayIcon.classList.replace('fa-play', 'fa-pause');
+                mainIcon.classList.replace('fa-play-circle','fa-pause-circle');
+                els.miniPlayIcon.classList.replace('fa-play','fa-pause');
             } else {
-                mainIcon.classList.replace('fa-pause-circle', 'fa-play-circle');
-                els.miniPlayIcon.classList.replace('fa-pause', 'fa-play');
+                mainIcon.classList.replace('fa-pause-circle','fa-play-circle');
+                els.miniPlayIcon.classList.replace('fa-pause','fa-play');
             }
         }
 
-        // --- Favorites functions ---
+        // Favorites: load/save/render
         function loadFavoritesFromStorage() {
             try {
                 const raw = localStorage.getItem(FAV_KEY);
@@ -491,7 +384,7 @@
                 const img = document.createElement('img');
                 img.src = f.thumb || `https://img.youtube.com/vi/${f.videoId}/hqdefault.jpg`;
                 img.className = 'fav-thumb';
-                img.alt = f.title;
+                img.alt = f.title || f.videoId;
 
                 const meta = document.createElement('div');
                 meta.className = 'fav-meta';
@@ -514,19 +407,13 @@
                 playBtn.className = 'btn-ghost';
                 playBtn.title = 'Play';
                 playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                playBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    playFavorite(idx);
-                };
+                playBtn.onclick = (e) => { e.stopPropagation(); playFavorite(idx); };
 
                 const delBtn = document.createElement('button');
                 delBtn.className = 'btn-ghost';
                 delBtn.title = 'Remove';
                 delBtn.innerHTML = '<i class="fas fa-trash"></i>';
-                delBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    removeFavorite(idx);
-                };
+                delBtn.onclick = (e) => { e.stopPropagation(); removeFavorite(idx); };
 
                 actions.appendChild(playBtn);
                 actions.appendChild(delBtn);
@@ -535,30 +422,46 @@
                 row.appendChild(meta);
                 row.appendChild(actions);
 
-                row.onclick = () => {
-                    playFavorite(idx);
-                };
+                row.onclick = () => { playFavorite(idx); };
 
                 els.favList.appendChild(row);
             });
         }
 
-        function addFavorite(fav) {
-            // avoid duplicates by videoId
+        // addFavorite: ensure title/artist via oEmbed if missing
+        async function addFavorite(fav) {
             if (!fav || !fav.videoId) return;
+            // ensure thumbnail
+            fav.thumb = fav.thumb || `https://img.youtube.com/vi/${fav.videoId}/maxresdefault.jpg`;
+            // if title missing, try oEmbed
+            if (!fav.title || fav.title.trim() === '') {
+                try {
+                    const meta = await fetchOEmbed(fav.videoId);
+                    if (meta) {
+                        fav.title = (meta.title || fav.title || '').trim();
+                        fav.artist = (meta.author_name || fav.artist || '').trim();
+                    }
+                } catch (e) { /* ignore */ }
+            }
+            // avoid duplicates
             const exists = favorites.findIndex(x => x.videoId === fav.videoId);
             if (exists !== -1) {
                 // move to top
                 const item = favorites.splice(exists,1)[0];
                 favorites.unshift(item);
             } else {
-                favorites.unshift(fav);
+                favorites.unshift({
+                    videoId: fav.videoId,
+                    title: fav.title || fav.videoId,
+                    artist: fav.artist || '',
+                    thumb: fav.thumb
+                });
             }
             saveFavoritesToStorage();
         }
 
         function removeFavorite(idx) {
-            favorites.splice(idx, 1);
+            favorites.splice(idx,1);
             saveFavoritesToStorage();
         }
 
@@ -568,28 +471,58 @@
             saveFavoritesToStorage();
         }
 
-        function playFavorite(idx) {
+        // playFavorite: set UI meta, load video, and fetch lyrics if possible
+        async function playFavorite(idx) {
             const f = favorites[idx];
             if (!f) return;
+            // set UI meta right away
+            setCurrentSongFromMeta(f);
+
+            // load video
             if (player && player.loadVideoById) {
-                // set metadata
-                setCurrentSongFromMeta(f);
-                player.loadVideoById(f.videoId);
-                // play after a short delay (player will start when ready)
+                try {
+                    player.loadVideoById(f.videoId);
+                } catch (e) {
+                    // fallback: cueVideoById then play
+                    try { player.cueVideoById(f.videoId); } catch(e2){}
+                }
                 setTimeout(()=>{ try{ player.playVideo(); }catch(e){} }, 600);
-                closeFavs();
+            }
+
+            closeFavs();
+
+            // try to fetch lyrics using stored title (preferred) or oEmbed title fallback
+            let query = '';
+            if (f.title && f.title.trim() !== '') {
+                query = f.title + (f.artist ? ' ' + f.artist : '');
+            } else {
+                try {
+                    const meta = await fetchOEmbed(f.videoId);
+                    if (meta && meta.title) {
+                        query = meta.title + (meta.author_name ? ' ' + meta.author_name : '');
+                        // update favorite record with fetched meta
+                        favorites[idx].title = meta.title;
+                        favorites[idx].artist = meta.author_name || favorites[idx].artist;
+                        saveFavoritesToStorage();
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+            if (query) {
+                // fetchLyrics will update title/artist UI too if it finds match
+                await fetchLyrics(query);
+            } else {
+                renderPlainLyrics("Lyrics not found for this track.");
             }
         }
 
+        // export/import
         function exportFavorites() {
             const blob = new Blob([JSON.stringify(favorites, null, 2)], {type: 'application/json'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = 'imusic_favorites.json';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+            a.href = url; a.download = 'imusic_favorites.json';
+            document.body.appendChild(a); a.click(); a.remove();
             URL.revokeObjectURL(url);
         }
 
@@ -599,10 +532,9 @@
                 try {
                     const arr = JSON.parse(e.target.result);
                     if (Array.isArray(arr)) {
-                        // concat but avoid duplicates
                         arr.forEach(item => {
                             if (item && item.videoId) {
-                                if (!favorites.find(f=>f.videoId===item.videoId)) favorites.push(item);
+                                if (!favorites.find(f => f.videoId === item.videoId)) favorites.push(item);
                             }
                         });
                         saveFavoritesToStorage();
@@ -617,34 +549,26 @@
             reader.readAsText(file);
         }
 
-        function openFavs() {
-            els.favPanel.classList.add('open');
-        }
-        function closeFavs() {
-            els.favPanel.classList.remove('open');
-        }
+        function openFavs() { els.favPanel.classList.add('open'); }
+        function closeFavs() { els.favPanel.classList.remove('open'); }
 
-        // --- Media Loading ---
+        // Media loading
         async function loadMedia() {
             const url = els.urlInput.value.trim();
             const query = els.queryInput.value.trim();
-            
             if (!url) { els.status.textContent = "URL required"; return; }
             const videoId = extractVideoId(url);
             if (!videoId) { els.status.textContent = "Invalid URL"; return; }
-
             els.status.textContent = "Loading...";
 
-            // Update visuals
             const thumbUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
             els.albumArt.src = thumbUrl;
             els.bgImage.src = thumbUrl;
 
-            // Try to set title/artist via query or oEmbed
+            // try to set meta: prefer query via lrclib, otherwise oEmbed
             if (query) {
                 await fetchLyrics(query);
             } else {
-                // try oEmbed for title/author
                 try {
                     const meta = await fetchOEmbed(videoId);
                     if (meta) {
@@ -653,29 +577,22 @@
                         currentSong.title = meta.title || currentSong.title;
                         currentSong.artist = meta.author_name || currentSong.artist;
                     }
-                } catch (e) {
-                    // ignore
-                }
+                } catch (e) { /* ignore */ }
             }
 
-            // set currentSong
             currentSong.videoId = videoId;
             currentSong.thumb = thumbUrl;
-            // if title currently default, set to videoId
             if (!currentSong.title || currentSong.title === "Music Player") {
                 currentSong.title = els.title.textContent || videoId;
                 currentSong.artist = els.artist.textContent || '';
             }
 
-            // Load Video
             if (player && player.loadVideoById) {
                 player.loadVideoById(videoId);
             }
 
             closeModal();
             els.status.textContent = "";
-
-            // update heart state
             updateHeartState();
         }
 
@@ -696,7 +613,7 @@
             }
         }
 
-        // --- Lyrics ---
+        // Lyrics fetch/parse/render (same as before)
         async function fetchLyrics(query) {
             try {
                 els.status.textContent = "Searching lyrics...";
@@ -719,6 +636,8 @@
             } catch (e) {
                 console.error(e);
                 renderPlainLyrics("Error fetching lyrics.");
+            } finally {
+                els.status.textContent = "";
             }
         }
 
@@ -742,24 +661,18 @@
 
         function renderSyncedLyrics() {
             els.lyricsContainer.innerHTML = '';
-            // Spacers for center alignment
             const spacer = document.createElement('div');
             spacer.style.height = "50vh";
-            els.lyricsContainer.appendChild(spacer.cloneNode(true)); // Top
-
-            lyrics.forEach((line, i) => {
+            els.lyricsContainer.appendChild(spacer.cloneNode(true));
+            lyrics.forEach((line,i) => {
                 const p = document.createElement('p');
                 p.className = 'lyric-line text-2xl md:text-4xl font-bold text-white/50 mb-6 md:mb-10';
                 p.dataset.index = i;
                 p.textContent = line.text;
-                p.onclick = () => {
-                    player.seekTo(line.time, true);
-                    player.playVideo();
-                };
+                p.onclick = () => { player.seekTo(line.time, true); player.playVideo(); };
                 els.lyricsContainer.appendChild(p);
             });
-
-            els.lyricsContainer.appendChild(spacer.cloneNode(true)); // Bottom
+            els.lyricsContainer.appendChild(spacer.cloneNode(true));
             currentLineIndex = -1;
         }
 
@@ -768,7 +681,7 @@
             els.lyricsContainer.innerHTML = `<div class="py-20 text-xl font-medium leading-relaxed text-center whitespace-pre-wrap px-4 text-white/80">${text}</div>`;
         }
 
-        // --- Sync Engine ---
+        // Sync engine
         function startLoop() {
             function loop() {
                 if (!player || !isPlaying) return;
@@ -791,19 +704,15 @@
 
         function syncLyrics(time) {
             if (lyrics.length === 0) return;
-            
-            // Sync logic
             let idx = -1;
-            const offset = 0.5; // Visual offset
+            const offset = 0.5;
             for (let i = 0; i < lyrics.length; i++) {
                 if (lyrics[i].time <= time + offset) idx = i;
                 else break;
             }
-
             if (idx !== -1 && idx !== currentLineIndex) {
                 const prev = els.lyricsContainer.querySelector('.lyric-line.active');
                 if (prev) prev.classList.remove('active');
-
                 const curr = els.lyricsContainer.querySelector(`p[data-index="${idx}"]`);
                 if (curr) {
                     curr.classList.add('active');
@@ -818,41 +727,32 @@
             const cHeight = container.clientHeight;
             const elTop = el.offsetTop;
             const elHeight = el.clientHeight;
-            // Scroll to center
-            container.scrollTo({
-                top: elTop - (cHeight / 2) + (elHeight / 2),
-                behavior: 'smooth'
-            });
+            container.scrollTo({ top: elTop - (cHeight/2) + (elHeight/2), behavior: 'smooth' });
         }
 
-        // --- Events ---
+        // Events
         els.playBtn.onclick = togglePlay;
-        
         els.progress.addEventListener('input', () => isDragging = true);
         els.progress.addEventListener('change', () => {
             isDragging = false;
-            if(player) player.seekTo((els.progress.value/100)*player.getDuration(), true);
+            if (player) player.seekTo((els.progress.value/100)*player.getDuration(), true);
         });
-
         document.getElementById('btn-prev').onclick = () => player && player.seekTo(player.getCurrentTime()-10, true);
         document.getElementById('btn-next').onclick = () => player && player.seekTo(player.getCurrentTime()+10, true);
 
         function formatTime(s) {
-            if(!s || isNaN(s)) return "0:00";
+            if (!s || isNaN(s)) return "0:00";
             const m = Math.floor(s/60);
             const sec = Math.floor(s%60);
             return `${m}:${sec.toString().padStart(2,'0')}`;
         }
 
-        // --- Favorite button handlers ---
+        // Favorite button handlers (async where needed)
         els.btnOpenFavs.addEventListener('click', openFavs);
         els.btnCloseFavs.addEventListener('click', closeFavs);
-        els.btnAddCurrentFav.addEventListener('click', () => {
-            if (!currentSong || !currentSong.videoId) {
-                alert('No song loaded to add.');
-                return;
-            }
-            addFavorite({
+        els.btnAddCurrentFav.addEventListener('click', async () => {
+            if (!currentSong || !currentSong.videoId) { alert('No song loaded to add.'); return; }
+            await addFavorite({
                 videoId: currentSong.videoId,
                 title: currentSong.title || els.title.textContent,
                 artist: currentSong.artist || els.artist.textContent,
@@ -869,16 +769,13 @@
             els.favImportFile.value = '';
         });
 
-        // heart (favorite toggle) near album art
-        els.btnFavorite.addEventListener('click', (e) => {
+        // heart (toggle)
+        els.btnFavorite.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (!currentSong || !currentSong.videoId) {
-                alert('No song loaded to add.');
-                return;
-            }
+            if (!currentSong || !currentSong.videoId) { alert('No song loaded to add.'); return; }
             const existsIndex = favorites.findIndex(x => x.videoId === currentSong.videoId);
             if (existsIndex === -1) {
-                addFavorite({
+                await addFavorite({
                     videoId: currentSong.videoId,
                     title: currentSong.title || els.title.textContent,
                     artist: currentSong.artist || els.artist.textContent,
@@ -891,22 +788,15 @@
 
         function updateHeartState() {
             const vid = currentSong && currentSong.videoId;
-            if (!vid) {
-                els.heartIcon.className = 'far fa-heart';
-                return;
-            }
+            if (!vid) { els.heartIcon.className = 'far fa-heart'; return; }
             const exists = favorites.find(f => f.videoId === vid);
-            if (exists) {
-                els.heartIcon.className = 'fas fa-heart text-red-400';
-            } else {
-                els.heartIcon.className = 'far fa-heart';
-            }
+            if (exists) els.heartIcon.className = 'fas fa-heart text-red-400';
+            else els.heartIcon.className = 'far fa-heart';
         }
 
-        // --- initialize ---
+        // Init
         loadFavoritesFromStorage();
 
-        // keep UI title/artist in sync when user clicks favorites -> setCurrentSongFromMeta will update UI
         function setCurrentSongFromMeta(meta) {
             currentSong.videoId = meta.videoId || currentSong.videoId;
             currentSong.title = meta.title || currentSong.title;
@@ -915,27 +805,19 @@
 
             els.title.textContent = currentSong.title || 'Music Player';
             els.artist.textContent = currentSong.artist || 'Select a song';
-            if (currentSong.thumb) {
-                els.albumArt.src = currentSong.thumb;
-                els.bgImage.src = currentSong.thumb;
-            }
+            if (currentSong.thumb) { els.albumArt.src = currentSong.thumb; els.bgImage.src = currentSong.thumb; }
             updateHeartState();
         }
 
-        // make sure when yt starts, if we have metadata from prior loadMedia call it will be used
-        // (loadMedia already sets currentSong)
-
-        // close favs when clicking outside (escape)
+        // keyboard esc to close/hide
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                closeFavs();
-                closeModal();
-                // also collapse fullscreen lyrics
+                closeFavs(); closeModal();
                 if (isLyricsMode) toggleLyricsMode();
             }
         });
 
-        // small safety: observe title changes to keep currentSong in sync when lyrics search sets metadata
+        // sync title changes to currentSong
         const titleObserver = new MutationObserver(()=> {
             currentSong.title = els.title.textContent;
             currentSong.artist = els.artist.textContent;
@@ -943,18 +825,11 @@
         });
         titleObserver.observe(els.title, { childList: true, subtree: true });
 
-        // load last favorite if you want (not automatic). For now do nothing.
-
-        // expose some helpers for console debugging (optional)
+        // expose for debugging
         window.imusic = {
-            addFavorite,
-            removeFavorite,
-            favorites,
-            loadFavoritesFromStorage,
-            saveFavoritesToStorage
+            addFavorite, removeFavorite, favorites, loadFavoritesFromStorage, saveFavoritesToStorage, playFavorite
         };
 
-        // Ensure heart state is initialized
         updateHeartState();
     </script>
 </body>
