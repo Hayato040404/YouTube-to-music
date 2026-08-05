@@ -43,6 +43,20 @@
             text-shadow: 0 0 20px rgba(255,255,255,0.5); color: #fff;
         }
 
+        /* ── 1文字同期（カラオケ） ── */
+        .lyric-char {
+            display: inline-block;
+            transition: opacity 0.08s linear;
+        }
+        .lyric-char.char-pending { opacity: 0.3; }
+        .lyric-line.active .lyric-char.char-active {
+            opacity: 1;
+            text-shadow: 0 0 14px rgba(255,255,255,0.55);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .lyric-char { transition: none; }
+        }
+
         .yt-mini-player {
             position: fixed; top:10px; left:10px; width:100px; height:56px;
             border-radius:8px; overflow:hidden; z-index:40; opacity:0.3;
@@ -85,6 +99,8 @@
         .fav-actions { display:flex; gap:8px; align-items:center; margin-left:8px; }
         .btn-ghost { background: rgba(255,255,255,0.03); padding:8px; border-radius:999px; border:1px solid rgba(255,255,255,0.04); }
 
+        textarea { resize: vertical; }
+
     </style>
 </head>
 <body class="text-white h-screen w-screen relative overflow-hidden">
@@ -105,6 +121,15 @@
     <div class="absolute top-0 right-0 p-6 z-50 flex gap-4">
         <button id="btn-toggle-lyrics" onclick="toggleLyricsMode()" class="md:hidden bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5">
             <i class="fas fa-expand-alt"></i>
+        </button>
+
+        <button id="btn-local-file" class="bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5" title="ローカルMP3を再生">
+            <i class="fas fa-file-audio"></i>
+        </button>
+        <input id="local-file-input" type="file" accept="audio/*,.mp3,.m4a,.wav,.flac,.ogg,.opus" style="display:none" />
+
+        <button id="btn-lyrics-input" class="bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5" title="歌詞を入力（LRC形式で同期 / Enhanced LRCでカラオケ）">
+            <i class="fas fa-pen"></i>
         </button>
 
         <button onclick="openModal()" class="bg-white/10 backdrop-blur-md w-10 h-10 rounded-full flex items-center justify-center text-white/80 hover:bg-white/20 transition shadow-lg border border-white/5">
@@ -191,15 +216,15 @@
 
             <div id="lyrics-controls" class="hidden md:hidden absolute bottom-4 left-0 right-0 flex justify-center items-center gap-6 pb-6 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none">
                 <div class="pointer-events-auto flex gap-6 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/5 shadow-2xl">
-                    <button onclick="player.seekTo(player.getCurrentTime()-10, true)" class="text-white/70"><i class="fas fa-undo-alt"></i></button>
+                    <button onclick="seekBy(-10)" class="text-white/70"><i class="fas fa-undo-alt"></i></button>
                     <button onclick="togglePlay()" class="text-white text-xl"><i id="mini-play-icon" class="fas fa-play"></i></button>
-                    <button onclick="player.seekTo(player.getCurrentTime()+10, true)" class="text-white/70"><i class="fas fa-redo-alt"></i></button>
+                    <button onclick="seekBy(10)" class="text-white/70"><i class="fas fa-redo-alt"></i></button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- モーダル -->
+    <!-- モーダル: YouTube URL -->
     <div id="setup-modal" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 transition-opacity duration-300" style="display:flex;">
         <div class="bg-[#1c1c1e] w-full max-w-lg p-6 md:p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
             <div class="relative z-10">
@@ -225,6 +250,13 @@
                         </div>
                     </div>
 
+                    <div class="text-xs text-white/40 leading-relaxed">
+                        <i class="fas fa-file-audio mr-1"></i> ローカルMP3を再生する場合は右上の
+                        <i class="fas fa-file-audio"></i> ボタンからファイルを選んでください。
+                        歌詞はファイル名（「アーティスト - 曲名.mp3」）で自動検索され、無ければ
+                        <i class="fas fa-pen"></i> ボタンから手入力できます。
+                    </div>
+
                     <div id="status-msg" class="text-sm font-medium text-yellow-500 h-5"></div>
 
                     <button onclick="loadMedia()" class="w-full bg-white text-black font-bold py-4 rounded-xl active:scale-95 transition shadow-lg flex items-center justify-center gap-2">
@@ -235,21 +267,57 @@
         </div>
     </div>
 
+    <!-- モーダル: 歌詞入力 -->
+    <div id="lyrics-modal" class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 transition-opacity duration-300" style="display:none;">
+        <div class="bg-[#1c1c1e] w-full max-w-xl p-6 md:p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
+            <div class="relative z-10">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">歌詞を入力</h2>
+                    <button onclick="closeLyricsModal()" class="text-white/50 hover:text-white p-2"><i class="fas fa-times text-xl"></i></button>
+                </div>
+                <p class="text-xs text-white/40 mb-3 leading-relaxed">
+                    タイムスタンプ付き（<span class="font-mono text-white/60">[00:12.50] 歌詞</span>）なら曲に同期します。
+                    Enhanced LRC（<span class="font-mono text-white/60">&lt;00:12.50&gt;</span> 単語タグ入り）なら
+                    1文字ずつ追うカラオケ表示になります。タイムスタンプなしはそのまま表示。保存はこのブラウザに残ります。
+                </p>
+                <textarea id="lyrics-input" rows="14" spellcheck="false"
+                    class="w-full bg-white/10 rounded-xl p-3 border border-white/5 text-sm font-mono text-white placeholder-white/30 focus:outline-none"
+                    placeholder="[00:12.50] 歌詞1行目&#10;[00:15.00] 歌詞2行目&#10;[00:15.50] &lt;00:15.50&gt;1&lt;00:15.60&gt;文字&lt;00:15.80&gt;単位（カラオケ）&#10;…"></textarea>
+                <div class="flex gap-2 mt-4">
+                    <button onclick="applyManualLyrics()" class="flex-1 bg-white text-black font-bold py-3 rounded-xl active:scale-95 transition">適用</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // State
-        let player;
+        // ============================================================
+        // 状態
+        // ============================================================
+        let player;                    // YouTube IFrame Player
+        const audio = new Audio();     // ローカル再生用 <audio>
+        let localObjectUrl = null;
         let isPlaying = false;
-        let animationFrameId;
-        let lyrics = [];
+        let animationFrameId = null;
+        let lyrics = [];               // parseLRC の結果: [{ time, text, chars }]
+        let hasTs = false;
         let currentLineIndex = -1;
+        let lyricRows = [];            // 描画行（fillKaraoke 用キャッシュ）
+        let lastRawLyrics = '';        // 歌詞入力モーダルの初期値用
         let isDragging = false;
         let isLyricsMode = false;
+        let source = 'yt';             // 'yt' | 'local'
 
-        // current song meta
-        let currentSong = { videoId: null, title: "Music Player", artist: "Select a song", thumb: null };
+        // ハイライトをわずかに先行させる（知覚上の遅れ対策）
+        const LYRIC_LEAD_SEC = 0.18;
 
+        // 現在の曲メタ
+        let currentSong = { videoId: null, title: "Music Player", artist: "Select a song", thumb: null, localKey: null };
+
+        // ============================================================
         // Elements
+        // ============================================================
         const els = {
             mainLayout: document.getElementById('main-layout'),
             playerSection: document.getElementById('player-section'),
@@ -270,6 +338,11 @@
             status: document.getElementById('status-msg'),
             urlInput: document.getElementById('input-url'),
             queryInput: document.getElementById('input-query'),
+            localFileBtn: document.getElementById('btn-local-file'),
+            localFileInput: document.getElementById('local-file-input'),
+            lyricsInputBtn: document.getElementById('btn-lyrics-input'),
+            lyricsModal: document.getElementById('lyrics-modal'),
+            lyricsInput: document.getElementById('lyrics-input'),
             favPanel: document.getElementById('favorites-panel'),
             favList: document.getElementById('fav-list'),
             btnOpenFavs: document.getElementById('btn-open-favs'),
@@ -287,7 +360,9 @@
         const FAV_KEY = 'imusic_favorites_v1';
         let favorites = [];
 
-        // Layout switching
+        // ============================================================
+        // レイアウト / モーダル
+        // ============================================================
         function toggleLyricsMode() {
             isLyricsMode = !isLyricsMode;
             const icon = els.toggleBtn.querySelector('i');
@@ -309,7 +384,6 @@
             }
         }
 
-        // Modal
         function openModal() {
             els.modal.style.display = 'flex';
             setTimeout(() => els.modal.style.opacity = '1', 10);
@@ -318,29 +392,51 @@
             els.modal.style.opacity = '0';
             setTimeout(() => els.modal.style.display = 'none', 300);
         }
+        function openLyricsModal() {
+            els.lyricsInput.value = lastRawLyrics || '';
+            els.lyricsModal.style.display = 'flex';
+            setTimeout(() => els.lyricsModal.style.opacity = '1', 10);
+            setTimeout(() => els.lyricsInput.focus(), 100);
+        }
+        function closeLyricsModal() {
+            els.lyricsModal.style.opacity = '0';
+            setTimeout(() => els.lyricsModal.style.display = 'none', 300);
+        }
 
-        // YouTube API
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('youtube-player', {
-                height: '100%', width: '100%', videoId: '',
-                playerVars: { 'playsinline':1, 'controls':1, 'disablekb':1, 'modestbranding':1, 'fs':0 },
-                events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange }
-            });
+        // ============================================================
+        // 再生コア（YouTube / ローカルMP3 を統一）
+        // ============================================================
+        function getCurrentTime() {
+            if (source === 'local') return audio.currentTime || 0;
+            return player && player.getCurrentTime ? player.getCurrentTime() : 0;
         }
-        function onPlayerReady(e) { /* ready */ }
-        function onPlayerStateChange(event) {
-            if (event.data == YT.PlayerState.PLAYING) {
-                isPlaying = true;
-                updatePlayIcons(true);
-                startLoop();
-            } else {
-                isPlaying = false;
-                updatePlayIcons(false);
-                cancelAnimationFrame(animationFrameId);
+        function getDuration() {
+            if (source === 'local') return audio.duration || 0;
+            return player && player.getDuration ? player.getDuration() : 0;
+        }
+        function seekTo(t) {
+            if (!Number.isFinite(t) || t < 0) return;
+            if (source === 'local') {
+                try { audio.currentTime = t; } catch (e) { /* ignore */ }
+            } else if (player && player.seekTo) {
+                try { player.seekTo(t, true); } catch (e) { /* ignore */ }
             }
-            updateHeartState();
+            // 一時停止中のシークでもハイライト/バーを即時更新
+            syncLyrics(getCurrentTime());
+            updateProgress(getCurrentTime(), getDuration());
         }
-        function togglePlay() { if(!player) return; if(isPlaying) player.pauseVideo(); else player.playVideo(); }
+        function seekBy(delta) { seekTo(getCurrentTime() + delta); }
+
+        function togglePlay() {
+            if (source === 'local') {
+                if (audio.paused) audio.play().catch(() => {});
+                else audio.pause();
+            } else if (player && player.playVideo) {
+                if (isPlaying) player.pauseVideo();
+                else player.playVideo();
+            }
+        }
+
         function updatePlayIcons(playing) {
             const mainIcon = els.playBtn.querySelector('i');
             if (playing) {
@@ -352,7 +448,532 @@
             }
         }
 
-        // Favorites: load/save/render
+        // ローカル再生を完全に停止（古いObjectURLを破棄）
+        function stopLocalAudio() {
+            if (localObjectUrl) {
+                try { URL.revokeObjectURL(localObjectUrl); } catch (e) { /* ignore */ }
+                localObjectUrl = null;
+            }
+            try {
+                audio.pause();
+                audio.removeAttribute('src');
+                audio.load();
+            } catch (e) { /* ignore */ }
+        }
+
+        // 同期ループ（再生中のみ。シークは seekTo 側で即時反映）
+        function startLoop() {
+            if (animationFrameId) return;
+            const loop = () => {
+                if (!isPlaying) { animationFrameId = null; return; }
+                const c = getCurrentTime();
+                updateProgress(c, getDuration());
+                syncLyrics(c);
+                animationFrameId = requestAnimationFrame(loop);
+            };
+            animationFrameId = requestAnimationFrame(loop);
+        }
+        function stopLoop() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+
+        // ============================================================
+        // YouTube API
+        // ============================================================
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('youtube-player', {
+                height: '100%', width: '100%', videoId: '',
+                playerVars: { 'playsinline':1, 'controls':1, 'disablekb':1, 'modestbranding':1, 'fs':0, 'origin': window.location.origin },
+                events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange, 'onError': onPlayerError }
+            });
+        }
+        function onPlayerReady(e) { /* ready */ }
+        function onPlayerError(event) {
+            // エラー153: プレーヤー設定エラー（file:// で開くと発生）
+            if (event.data === 153) {
+                els.status.textContent = "YouTube再生エラー(153)。このファイルをHTTPサーバー経由で開いてください（例: このフォルダで `python3 -m http.server 8000` → http://localhost:8000/beta.html ）";
+            } else {
+                els.status.textContent = "YouTube再生エラー: " + event.data;
+            }
+        }
+        function onPlayerStateChange(event) {
+            if (source !== 'yt') return;
+            if (event.data == YT.PlayerState.PLAYING) {
+                isPlaying = true;
+                updatePlayIcons(true);
+                startLoop();
+            } else if (event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.ENDED) {
+                isPlaying = false;
+                updatePlayIcons(false);
+                stopLoop();
+                if (event.data == YT.PlayerState.PAUSED) {
+                    syncLyrics(getCurrentTime());
+                    updateProgress(getCurrentTime(), getDuration());
+                }
+            }
+            updateHeartState();
+        }
+
+        // ローカル音声イベント
+        audio.addEventListener('play', () => {
+            if (source !== 'local') return;
+            isPlaying = true;
+            updatePlayIcons(true);
+            startLoop();
+        });
+        audio.addEventListener('pause', () => {
+            if (source !== 'local') return;
+            isPlaying = false;
+            updatePlayIcons(false);
+            stopLoop();
+            syncLyrics(getCurrentTime());
+            updateProgress(getCurrentTime(), getDuration());
+        });
+        audio.addEventListener('ended', () => {
+            if (source !== 'local') return;
+            isPlaying = false;
+            updatePlayIcons(false);
+            stopLoop();
+        });
+        audio.addEventListener('loadedmetadata', () => {
+            if (source !== 'local') return;
+            els.duration.textContent = formatTime(audio.duration);
+            updateProgress(audio.currentTime, audio.duration);
+        });
+        audio.addEventListener('error', () => {
+            if (source !== 'local') return;
+            els.status.textContent = 'ファイルを再生できません';
+        });
+
+        // ============================================================
+        // LRC / Enhanced LRC パーサ（拡張から移植・軽量化）
+        // ============================================================
+        /** LRC 小数部: 1桁=1/10秒, 2桁=1/100, 3-4桁=ミリ秒 */
+        function parseLrcFraction(raw) {
+            if (!raw) return 0;
+            const s = String(raw).replace(/\D/g, '');
+            if (!s) return 0;
+            if (s.length <= 2) return parseInt(s, 10) / Math.pow(10, s.length);
+            return parseInt(s.slice(0, 3), 10) / 1000;
+        }
+
+        /** Enhanced/Dynamic LRC の <mm:ss.xx> 単語タグから文字単位タイミングを抽出。
+         *  戻り: [{ t: 秒, c: 文字 }]。単語タグが無ければ null。 */
+        function buildLineChars(rawText) {
+            if (!rawText) return null;
+            const tagRe = /<\s*(\d{1,2})\s*:\s*(\d{2})\s*(?:[.:]\s*(\d{1,4})\s*)?\s*>/g;
+            const tags = [];
+            let m;
+            tagRe.lastIndex = 0;
+            while ((m = tagRe.exec(rawText)) !== null) {
+                tags.push({
+                    index: m.index,
+                    end: m.index + m[0].length,
+                    time: parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + parseLrcFraction(m[3]),
+                });
+            }
+            if (!tags.length) return null;
+
+            const out = [];
+            let pos = 0;
+            for (let i = 0; i < tags.length; i++) {
+                const tag = tags[i];
+                const chunk = rawText.slice(pos, tag.index);
+                if (chunk) {
+                    const t0 = i > 0 ? tags[i - 1].time : tag.time;
+                    distributeChars(out, chunk, t0, tag.time);
+                }
+                pos = tag.end;
+            }
+            const tail = rawText.slice(pos);
+            if (tail) {
+                distributeChars(out, tail, tags[tags.length - 1].time, tags[tags.length - 1].time);
+            }
+            return out.length ? out : null;
+        }
+
+        /** 文字を [t0, t1] に均等配分（t1 <= t0 なら全文字 t0 に揃える） */
+        function distributeChars(out, chunk, t0, t1) {
+            const arr = Array.from(chunk);
+            const n = arr.length;
+            if (!n) return;
+            if (!(t1 > t0)) {
+                for (let i = 0; i < n; i++) out.push({ t: t0, c: arr[i] });
+                return;
+            }
+            const step = (t1 - t0) / n;
+            for (let i = 0; i < n; i++) out.push({ t: t0 + step * i, c: arr[i] });
+        }
+
+        /** LRC 全体を解析。戻り: { lines: [{time, text, chars}], hasTs } */
+        function parseLRC(lrc) {
+            if (!lrc) return { lines: [], hasTs: false };
+            const tagTest = /\[\s*\d{1,2}\s*:\s*\d{2}\s*(?:[.:]\s*\d{1,4}\s*)?\]/;
+            if (!tagTest.test(lrc)) {
+                const lines = lrc
+                    .split(/\r?\n/)
+                    .map((line) => ({
+                        time: null,
+                        // プレーン歌詞でも <mm:ss.xx> や [ar:]/[ti:]/[offset:] 等のメタ行は混ぜない
+                        text: (line || '')
+                            .trim()
+                            .replace(/<\s*\d{1,2}\s*:\s*\d{2}\s*(?:[.:]\s*\d{1,4}\s*)?\s*>/g, ''),
+                    }))
+                    .filter((l) => l.text && !/^\[\s*[a-zA-Z]+:/.test(l.text));
+                return { lines, hasTs: false };
+            }
+
+            const tagExp = /\[\s*(\d{1,2})\s*:\s*(\d{2})\s*(?:[.:]\s*(\d{1,4})\s*)?\]/g;
+            const result = [];
+
+            lrc.split(/\r?\n/).forEach((lineStr) => {
+                const line = (lineStr || '').trim();
+                if (!line) return;
+                // [ar:], [ti:], [offset:] 等のメタ行はスキップ
+                if (/^\[\s*[a-zA-Z]+:/.test(line) && !tagTest.test(line)) return;
+
+                const tags = [];
+                let match;
+                tagExp.lastIndex = 0;
+                while ((match = tagExp.exec(line)) !== null) {
+                    tags.push(
+                        parseInt(match[1], 10) * 60 +
+                        parseInt(match[2], 10) +
+                        parseLrcFraction(match[3])
+                    );
+                }
+                if (!tags.length) return;
+                // 行タグを除去した本文（<mm:ss.xx> 単語タグは残す）
+                const body = line.replace(/\[\s*\d{1,2}\s*:\s*\d{2}\s*(?:[.:]\s*\d{1,4}\s*)?\]/g, '');
+                const chars = buildLineChars(body);
+                let text = body
+                    .replace(/<\s*\d{1,2}\s*:\s*\d{2}\s*(?:[.:]\s*\d{1,4}\s*)?\s*>/g, '')
+                    .replace(/^\s*\/\s*/, '')
+                    .trim();
+                if (!text) return;
+                tags.forEach((time) => result.push({ time, text, chars }));
+            });
+
+            result.sort((a, b) => (a.time || 0) - (b.time || 0));
+            // 0.00 付近のノイズのみ除去（0.5 未満を全部捨てると冒頭歌詞が欠落する）
+            const lines = result.filter((l) => {
+                if (l.time == null) return true;
+                if (l.time > 0.05) return true;
+                const t = (l.text || '').trim();
+                if (!t) return false;
+                if (/^[♪🎵✨\-\.·•…〜~]+$/.test(t)) return false;
+                return true;
+            });
+            return {
+                lines,
+                hasTs: lines.some((l) => typeof l.time === 'number'),
+            };
+        }
+
+        // ============================================================
+        // 歌詞取得（LRCHub 優先 → LrcLib。CORS不可時は自動フォールバック）
+        // ============================================================
+        async function fetchLyrics(track, artist) {
+            const t = (track || '').trim();
+            const a = (artist || '').trim();
+            if (!t) return false;
+
+            els.status.textContent = "Searching lyrics...";
+            const hasWordTags = (s) => /<\s*\d{1,2}\s*:\s*\d{2}/.test(s || '');
+            const looksSynced = (s) => /\[\s*\d{1,2}\s*:\s*\d{2}/.test(s || '');
+
+            // レスポンスから歌詞テキストを抽出（カラオケ用 dynamic を優先）
+            const extract = (res) => {
+                if (!res || typeof res !== 'object') return '';
+                const hasLineTag = (s) => /\[\s*\d{1,2}\s*:\s*\d{2}/.test(s || '');
+                for (const f of [res.dynamic_lrc, res.dynamic_lyrics, res.animated_lyrics]) {
+                    if (typeof f === 'string' && f.trim() && hasLineTag(f)) return f.trim();
+                }
+                for (const f of [
+                    res.lyrics, res.synced_lyrics, res.syncedLyrics,
+                    res.lrc, res.plain_lyrics, res.plainLyrics, res.text,
+                ]) {
+                    if (typeof f === 'string' && f.trim()) return f.trim();
+                }
+                if (res.record && typeof res.record === 'object') return extract(res.record);
+                return '';
+            };
+
+            // LrcLib の検索結果から最良ヒットを選ぶ
+            const pickBest = (items) => {
+                if (!Array.isArray(items) || !items.length) return null;
+                const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
+                const target = norm(a);
+                const getArtist = (it) => it.artistName || it.artist || it.artist_name || '';
+                const synced = (it) => !!(it.syncedLyrics || it.synced_lyrics);
+                if (target) {
+                    let hit = items.find((it) => norm(getArtist(it)) === target && synced(it));
+                    if (hit) return hit;
+                    hit = items.find((it) => norm(getArtist(it)) === target);
+                    if (hit) return hit;
+                    hit = items.find((it) => {
+                        const x = norm(getArtist(it));
+                        return x && (x.includes(target) || target.includes(x)) && synced(it);
+                    });
+                    if (hit) return hit;
+                }
+                return items.find(synced) || items[0] || null;
+            };
+
+            try {
+                // 1) LRCHub（カラオケ用 dynamic_lrc。CORS が無ければ即失敗→フォールバック）
+                const lrchub = (async () => {
+                    try {
+                        const res = await fetch('https://lrchub.coreone.work/api/lyrics', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ track: t, artist: a }),
+                        });
+                        if (!res.ok) return '';
+                        const j = await res.json();
+                        return extract(j);
+                    } catch (e) {
+                        return '';
+                    }
+                })();
+
+                // 2) LrcLib（行同期。CORS 許可済み）
+                const lrclib = (async () => {
+                    try {
+                        const u = new URL('https://lrclib.net/api/search');
+                        u.searchParams.set('track_name', t);
+                        if (a) u.searchParams.set('artist_name', a);
+                        const res = await fetch(u.toString());
+                        if (!res.ok) return { text: '', hit: null };
+                        const list = await res.json();
+                        const hit = pickBest(list);
+                        if (!hit) return { text: '', hit: null };
+                        return {
+                            text: (hit.syncedLyrics || hit.synced_lyrics || hit.plainLyrics || hit.plain_lyrics || '').trim(),
+                            hit,
+                        };
+                    } catch (e) {
+                        return { text: '', hit: null };
+                    }
+                })();
+
+                const [hub, lib] = await Promise.all([lrchub, lrclib]);
+                // カラオケ（文字同期）優先 → LRCHub → LrcLib
+                let text = hub && hasWordTags(hub) ? hub : (hub || lib.text || '');
+                let hit = lib.hit || null;
+
+                // ヒット情報でタイトル/アーティストを補正
+                if (hit && hit.trackName) {
+                    els.title.textContent = hit.trackName;
+                    els.artist.textContent = hit.artistName || els.artist.textContent;
+                    currentSong.title = hit.trackName;
+                    currentSong.artist = hit.artistName || currentSong.artist;
+                }
+
+                if (text) {
+                    const { lines, hasTs: ts } = parseLRC(text);
+                    if (lines.length) {
+                        lastRawLyrics = text;
+                        if (ts) {
+                            lyrics = lines;
+                            hasTs = true;
+                            renderSyncedLyrics();
+                        } else {
+                            renderPlainLyrics(lines.map((l) => l.text).join('\n'));
+                        }
+                        els.status.textContent = "";
+                        return true;
+                    }
+                }
+                renderPlainLyrics("Lyrics not found.");
+                els.status.textContent = "";
+                return false;
+            } catch (e) {
+                console.error(e);
+                renderPlainLyrics("Error fetching lyrics.");
+                els.status.textContent = "";
+                return false;
+            }
+        }
+
+        // ============================================================
+        // 歌詞描画（カラオケ対応）
+        // ============================================================
+        function renderSyncedLyrics() {
+            els.lyricsContainer.innerHTML = '';
+            lyricRows = [];
+            if (!lyrics.length) return;
+
+            const spacer = document.createElement('div');
+            spacer.style.height = "50vh";
+            els.lyricsContainer.appendChild(spacer);
+
+            lyrics.forEach((line, i) => {
+                const p = document.createElement('p');
+                p.className = 'lyric-line text-2xl md:text-4xl font-bold text-white/50 mb-6 md:mb-10';
+                p.dataset.index = i;
+
+                // Enhanced/Dynamic LRC の文字タイミングがあればカラオケ用 span を生成
+                if (line.chars && line.chars.length > 0 && line.chars.length <= 400) {
+                    const holder = document.createElement('span');
+                    const times = [];
+                    const spans = [];
+                    for (const ch of line.chars) {
+                        if (ch.c === ' ' || ch.c === '\t') {
+                            // 空白は span にしない（DOM数と毎フレーム処理を削減）
+                            holder.appendChild(document.createTextNode('\u00A0'));
+                            continue;
+                        }
+                        const s = document.createElement('span');
+                        s.className = 'lyric-char char-pending';
+                        s.textContent = ch.c;
+                        holder.appendChild(s);
+                        times.push(ch.t);
+                        spans.push(s);
+                    }
+                    p.appendChild(holder);
+                    if (times.length) {
+                        p._charTimes = times;
+                        p._charSpans = spans;
+                    }
+                } else {
+                    p.textContent = line.text || '';
+                }
+
+                p.onclick = () => {
+                    if (!hasTs || typeof line.time !== 'number') return;
+                    seekTo(line.time);
+                    if (!isPlaying) togglePlay();
+                };
+                els.lyricsContainer.appendChild(p);
+                lyricRows.push(p);
+            });
+
+            els.lyricsContainer.appendChild(spacer.cloneNode(false));
+            currentLineIndex = -1;
+        }
+
+        /** カラオケ（1文字追尾）。アクティブ行の span だけを差分更新。 */
+        function fillKaraoke(t) {
+            if (!hasTs || !lyrics.length) return;
+            if (!Number.isFinite(t) || t < 0) return;
+            const idx = currentLineIndex;
+            if (idx < 0) return;
+            const row = lyricRows[idx];
+            if (!row || !row._charTimes || !row._charTimes.length) return;
+            const times = row._charTimes;
+
+            // 時刻 t までに点灯する文字数を二分探索
+            let lo = 0, hi = times.length - 1, n = 0;
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                if (times[mid] <= t) { n = mid + 1; lo = mid + 1; }
+                else hi = mid - 1;
+            }
+
+            const prev = typeof row._prevFill === 'number' ? row._prevFill : -1;
+            if (n === prev) return;
+            const spans = row._charSpans;
+            if (n > prev) {
+                for (let i = prev < 0 ? 0 : prev; i < n; i++) spans[i].classList.add('char-active');
+            } else {
+                for (let i = n; i < prev; i++) spans[i].classList.remove('char-active');
+            }
+            row._prevFill = n;
+        }
+
+        function renderPlainLyrics(text) {
+            lyrics = [];
+            hasTs = false;
+            currentLineIndex = -1;
+            lyricRows = [];
+            els.lyricsContainer.innerHTML = '';
+            const div = document.createElement('div');
+            div.className = 'py-20 text-xl font-medium leading-relaxed text-center whitespace-pre-wrap px-4 text-white/80';
+            div.textContent = text || '';
+            els.lyricsContainer.appendChild(div);
+        }
+
+        // 手入力 / 保存済み歌詞の適用
+        function applyLyricsText(text) {
+            lastRawLyrics = text;
+            const { lines, hasTs: ts } = parseLRC(text);
+            if (lines.length && ts) {
+                lyrics = lines;
+                hasTs = true;
+                renderSyncedLyrics();
+            } else {
+                renderPlainLyrics(text.trim());
+            }
+        }
+
+        function applyManualLyrics() {
+            const text = els.lyricsInput.value;
+            if (!text || !text.trim()) return;
+            const key = (source === 'local'
+                ? (currentSong.localKey || 'local')
+                : ('yt_' + (currentSong.videoId || 'local')));
+            try { localStorage.setItem('lm_lyrics_' + key, text); } catch (e) { /* ignore */ }
+            applyLyricsText(text);
+            els.status.textContent = '歌詞を適用しました';
+            closeLyricsModal();
+        }
+
+        // ============================================================
+        // 同期エンジン
+        // ============================================================
+        function syncLyrics(time) {
+            if (!lyrics.length || !hasTs) return;
+            if (!Number.isFinite(time) || time < 0) return;
+
+            const syncT = time + LYRIC_LEAD_SEC;
+            const first = lyrics.find((l) => typeof l.time === 'number');
+            let idx = -1;
+            if (first && syncT >= first.time) {
+                let lo = 0, hi = lyrics.length - 1;
+                while (lo <= hi) {
+                    const mid = (lo + hi) >> 1;
+                    const tm = lyrics[mid].time;
+                    if (typeof tm === 'number' && tm <= syncT) { idx = mid; lo = mid + 1; }
+                    else hi = mid - 1;
+                }
+            }
+
+            if (idx !== currentLineIndex) {
+                if (currentLineIndex >= 0 && currentLineIndex < lyricRows.length) {
+                    lyricRows[currentLineIndex].classList.remove('active');
+                }
+                currentLineIndex = idx;
+                if (idx >= 0 && idx < lyricRows.length) {
+                    lyricRows[idx].classList.add('active');
+                    scrollToActiveLine(lyricRows[idx]);
+                }
+            }
+            fillKaraoke(time);
+        }
+
+        function scrollToActiveLine(el) {
+            const container = els.lyricsContainer;
+            const cHeight = container.clientHeight;
+            const elTop = el.offsetTop;
+            const elHeight = el.clientHeight;
+            container.scrollTo({ top: elTop - (cHeight/2) + (elHeight/2), behavior: 'smooth' });
+        }
+
+        function updateProgress(curr, dur) {
+            if (!isDragging) {
+                els.progress.value = (curr / dur) * 100 || 0;
+                els.currTime.textContent = formatTime(curr);
+                els.duration.textContent = formatTime(dur);
+            }
+        }
+
+        // ============================================================
+        // Favorites
+        // ============================================================
         function loadFavoritesFromStorage() {
             try {
                 const raw = localStorage.getItem(FAV_KEY);
@@ -428,12 +1049,9 @@
             });
         }
 
-        // addFavorite: ensure title/artist via oEmbed if missing
         async function addFavorite(fav) {
             if (!fav || !fav.videoId) return;
-            // ensure thumbnail
             fav.thumb = fav.thumb || `https://img.youtube.com/vi/${fav.videoId}/maxresdefault.jpg`;
-            // if title missing, try oEmbed
             if (!fav.title || fav.title.trim() === '') {
                 try {
                     const meta = await fetchOEmbed(fav.videoId);
@@ -443,10 +1061,8 @@
                     }
                 } catch (e) { /* ignore */ }
             }
-            // avoid duplicates
             const exists = favorites.findIndex(x => x.videoId === fav.videoId);
             if (exists !== -1) {
-                // move to top
                 const item = favorites.splice(exists,1)[0];
                 favorites.unshift(item);
             } else {
@@ -471,52 +1087,29 @@
             saveFavoritesToStorage();
         }
 
-        // playFavorite: set UI meta, load video, and fetch lyrics if possible
         async function playFavorite(idx) {
             const f = favorites[idx];
             if (!f) return;
-            // set UI meta right away
             setCurrentSongFromMeta(f);
 
-            // load video
+            // ローカル再生を停止し、YouTube ソースへ切替
+            stopLocalAudio();
+            source = 'yt';
+
             if (player && player.loadVideoById) {
                 try {
                     player.loadVideoById(f.videoId);
                 } catch (e) {
-                    // fallback: cueVideoById then play
                     try { player.cueVideoById(f.videoId); } catch(e2){}
                 }
                 setTimeout(()=>{ try{ player.playVideo(); }catch(e){} }, 600);
             }
 
             closeFavs();
-
-            // try to fetch lyrics using stored title (preferred) or oEmbed title fallback
-            let query = '';
-            if (f.title && f.title.trim() !== '') {
-                query = f.title + (f.artist ? ' ' + f.artist : '');
-            } else {
-                try {
-                    const meta = await fetchOEmbed(f.videoId);
-                    if (meta && meta.title) {
-                        query = meta.title + (meta.author_name ? ' ' + meta.author_name : '');
-                        // update favorite record with fetched meta
-                        favorites[idx].title = meta.title;
-                        favorites[idx].artist = meta.author_name || favorites[idx].artist;
-                        saveFavoritesToStorage();
-                    }
-                } catch (e) { /* ignore */ }
-            }
-
-            if (query) {
-                // fetchLyrics will update title/artist UI too if it finds match
-                await fetchLyrics(query);
-            } else {
-                renderPlainLyrics("Lyrics not found for this track.");
-            }
+            await fetchLyrics(f.title, f.artist);
+            startLoop();
         }
 
-        // export/import
         function exportFavorites() {
             const blob = new Blob([JSON.stringify(favorites, null, 2)], {type: 'application/json'});
             const url = URL.createObjectURL(blob);
@@ -552,7 +1145,9 @@
         function openFavs() { els.favPanel.classList.add('open'); }
         function closeFavs() { els.favPanel.classList.remove('open'); }
 
-        // Media loading
+        // ============================================================
+        // メディア読み込み
+        // ============================================================
         async function loadMedia() {
             const url = els.urlInput.value.trim();
             const query = els.queryInput.value.trim();
@@ -561,13 +1156,24 @@
             if (!videoId) { els.status.textContent = "Invalid URL"; return; }
             els.status.textContent = "Loading...";
 
+            stopLocalAudio();
+            source = 'yt';
+
             const thumbUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
             els.albumArt.src = thumbUrl;
             els.bgImage.src = thumbUrl;
 
-            // try to set meta: prefer query via lrclib, otherwise oEmbed
+            currentSong = {
+                videoId,
+                title: els.title.textContent || 'Music Player',
+                artist: els.artist.textContent || '',
+                thumb: thumbUrl,
+                localKey: null,
+            };
+
             if (query) {
-                await fetchLyrics(query);
+                // "曲名 アーティスト" をまとめて検索
+                await fetchLyrics(query, '');
             } else {
                 try {
                     const meta = await fetchOEmbed(videoId);
@@ -576,24 +1182,72 @@
                         els.artist.textContent = meta.author_name || els.artist.textContent;
                         currentSong.title = meta.title || currentSong.title;
                         currentSong.artist = meta.author_name || currentSong.artist;
+                        await fetchLyrics(currentSong.title, currentSong.artist);
+                    } else {
+                        renderPlainLyrics('歌詞を取得できませんでした（検索欄に曲名を入れると取得できます）');
                     }
                 } catch (e) { /* ignore */ }
             }
 
-            currentSong.videoId = videoId;
-            currentSong.thumb = thumbUrl;
-            if (!currentSong.title || currentSong.title === "Music Player") {
-                currentSong.title = els.title.textContent || videoId;
-                currentSong.artist = els.artist.textContent || '';
-            }
-
             if (player && player.loadVideoById) {
-                player.loadVideoById(videoId);
+                try {
+                    player.loadVideoById(videoId);
+                } catch (e) {
+                    try { player.cueVideoById(videoId); } catch(e2){}
+                }
             }
 
             closeModal();
             els.status.textContent = "";
             updateHeartState();
+        }
+
+        // ローカルMP3/音声ファイルの再生
+        async function openLocalFile(file) {
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            stopLocalAudio();
+
+            // YouTube 再生を停止
+            if (player && player.pauseVideo) {
+                try { player.pauseVideo(); } catch (e) { /* ignore */ }
+            }
+            source = 'local';
+            localObjectUrl = url;
+
+            // ファイル名 "アーティスト - 曲名.mp3" → メタ
+            let title = file.name.replace(/\.[^.]+$/, '');
+            let artist = '';
+            const parts = title.split(/\s+[-–—]\s+/);
+            if (parts.length >= 2) {
+                artist = parts[0].trim();
+                title = parts.slice(1).join(' - ').trim();
+            }
+            currentSong = { videoId: null, title, artist, thumb: null, localKey: file.name };
+            els.title.textContent = title;
+            els.artist.textContent = artist || 'Local file';
+            updateHeartState();
+            closeModal();
+            closeFavs();
+
+            audio.src = url;
+            try { await audio.play(); } catch (e) { els.status.textContent = '再生を開始できません（ブラウザの自動再生制限?）'; }
+
+            // 歌詞: 保存済み手入力 → 自動取得 → 空
+            const key = 'lm_lyrics_' + file.name;
+            let applied = false;
+            try {
+                const stored = localStorage.getItem(key);
+                if (stored && stored.trim()) {
+                    applyLyricsText(stored);
+                    applied = true;
+                }
+            } catch (e) { /* ignore */ }
+
+            if (!applied) {
+                const found = await fetchLyrics(title, artist);
+                if (!found) renderPlainLyrics('歌詞がありません。右上の「歌詞入力」から追加できます。');
+            }
         }
 
         function extractVideoId(url) {
@@ -613,132 +1267,29 @@
             }
         }
 
-        // Lyrics fetch/parse/render (same as before)
-        async function fetchLyrics(query) {
-            try {
-                els.status.textContent = "Searching lyrics...";
-                const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(query)}`);
-                const data = await res.json();
-                const bestMatch = data.find(t => t.syncedLyrics) || data[0];
-
-                if (bestMatch) {
-                    els.title.textContent = bestMatch.trackName;
-                    els.artist.textContent = bestMatch.artistName;
-                    currentSong.title = bestMatch.trackName;
-                    currentSong.artist = bestMatch.artistName;
-                    if (bestMatch.syncedLyrics) parseLyrics(bestMatch.syncedLyrics);
-                    else if (bestMatch.plainLyrics) renderPlainLyrics(bestMatch.plainLyrics);
-                    else renderPlainLyrics("No lyric content found.");
-                } else {
-                    renderPlainLyrics("Lyrics not found on LrcLib.");
-                    els.title.textContent = "Unknown Song";
-                }
-            } catch (e) {
-                console.error(e);
-                renderPlainLyrics("Error fetching lyrics.");
-            } finally {
-                els.status.textContent = "";
-            }
-        }
-
-        function parseLyrics(lrc) {
-            lyrics = [];
-            const lines = lrc.split('\n');
-            const timeReg = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
-            lines.forEach(line => {
-                const match = line.match(timeReg);
-                if (match) {
-                    const min = parseInt(match[1]);
-                    const sec = parseInt(match[2]);
-                    const ms = parseFloat("0." + match[3]);
-                    const time = min * 60 + sec + ms;
-                    const text = line.replace(timeReg, '').trim();
-                    if (text) lyrics.push({ time, text });
-                }
-            });
-            renderSyncedLyrics();
-        }
-
-        function renderSyncedLyrics() {
-            els.lyricsContainer.innerHTML = '';
-            const spacer = document.createElement('div');
-            spacer.style.height = "50vh";
-            els.lyricsContainer.appendChild(spacer.cloneNode(true));
-            lyrics.forEach((line,i) => {
-                const p = document.createElement('p');
-                p.className = 'lyric-line text-2xl md:text-4xl font-bold text-white/50 mb-6 md:mb-10';
-                p.dataset.index = i;
-                p.textContent = line.text;
-                p.onclick = () => { player.seekTo(line.time, true); player.playVideo(); };
-                els.lyricsContainer.appendChild(p);
-            });
-            els.lyricsContainer.appendChild(spacer.cloneNode(true));
-            currentLineIndex = -1;
-        }
-
-        function renderPlainLyrics(text) {
-            lyrics = [];
-            els.lyricsContainer.innerHTML = `<div class="py-20 text-xl font-medium leading-relaxed text-center whitespace-pre-wrap px-4 text-white/80">${text}</div>`;
-        }
-
-        // Sync engine
-        function startLoop() {
-            function loop() {
-                if (!player || !isPlaying) return;
-                const c = player.getCurrentTime();
-                const d = player.getDuration();
-                updateProgress(c, d);
-                syncLyrics(c);
-                animationFrameId = requestAnimationFrame(loop);
-            }
-            animationFrameId = requestAnimationFrame(loop);
-        }
-
-        function updateProgress(curr, dur) {
-            if (!isDragging) {
-                els.progress.value = (curr / dur) * 100 || 0;
-                els.currTime.textContent = formatTime(curr);
-                els.duration.textContent = formatTime(dur);
-            }
-        }
-
-        function syncLyrics(time) {
-            if (lyrics.length === 0) return;
-            let idx = -1;
-            const offset = 0.5;
-            for (let i = 0; i < lyrics.length; i++) {
-                if (lyrics[i].time <= time + offset) idx = i;
-                else break;
-            }
-            if (idx !== -1 && idx !== currentLineIndex) {
-                const prev = els.lyricsContainer.querySelector('.lyric-line.active');
-                if (prev) prev.classList.remove('active');
-                const curr = els.lyricsContainer.querySelector(`p[data-index="${idx}"]`);
-                if (curr) {
-                    curr.classList.add('active');
-                    scrollToActiveLine(curr);
-                }
-                currentLineIndex = idx;
-            }
-        }
-
-        function scrollToActiveLine(el) {
-            const container = els.lyricsContainer;
-            const cHeight = container.clientHeight;
-            const elTop = el.offsetTop;
-            const elHeight = el.clientHeight;
-            container.scrollTo({ top: elTop - (cHeight/2) + (elHeight/2), behavior: 'smooth' });
-        }
-
+        // ============================================================
         // Events
+        // ============================================================
         els.playBtn.onclick = togglePlay;
         els.progress.addEventListener('input', () => isDragging = true);
         els.progress.addEventListener('change', () => {
             isDragging = false;
-            if (player) player.seekTo((els.progress.value/100)*player.getDuration(), true);
+            const d = getDuration();
+            if (d > 0) seekTo((els.progress.value / 100) * d);
         });
-        document.getElementById('btn-prev').onclick = () => player && player.seekTo(player.getCurrentTime()-10, true);
-        document.getElementById('btn-next').onclick = () => player && player.seekTo(player.getCurrentTime()+10, true);
+        document.getElementById('btn-prev').onclick = () => seekBy(-10);
+        document.getElementById('btn-next').onclick = () => seekBy(10);
+
+        // ローカルファイル選択
+        els.localFileBtn.addEventListener('click', () => els.localFileInput.click());
+        els.localFileInput.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (f) openLocalFile(f);
+            els.localFileInput.value = '';
+        });
+
+        // 歌詞入力モーダル
+        els.lyricsInputBtn.addEventListener('click', openLyricsModal);
 
         function formatTime(s) {
             if (!s || isNaN(s)) return "0:00";
@@ -747,7 +1298,7 @@
             return `${m}:${sec.toString().padStart(2,'0')}`;
         }
 
-        // Favorite button handlers (async where needed)
+        // Favorite buttons
         els.btnOpenFavs.addEventListener('click', openFavs);
         els.btnCloseFavs.addEventListener('click', closeFavs);
         els.btnAddCurrentFav.addEventListener('click', async () => {
@@ -769,7 +1320,7 @@
             els.favImportFile.value = '';
         });
 
-        // heart (toggle)
+        // heart
         els.btnFavorite.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (!currentSong || !currentSong.videoId) { alert('No song loaded to add.'); return; }
@@ -794,7 +1345,9 @@
             else els.heartIcon.className = 'far fa-heart';
         }
 
+        // ============================================================
         // Init
+        // ============================================================
         loadFavoritesFromStorage();
 
         function setCurrentSongFromMeta(meta) {
@@ -809,10 +1362,10 @@
             updateHeartState();
         }
 
-        // keyboard esc to close/hide
+        // keyboard esc
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                closeFavs(); closeModal();
+                closeFavs(); closeModal(); closeLyricsModal();
                 if (isLyricsMode) toggleLyricsMode();
             }
         });
@@ -827,7 +1380,9 @@
 
         // expose for debugging
         window.imusic = {
-            addFavorite, removeFavorite, favorites, loadFavoritesFromStorage, saveFavoritesToStorage, playFavorite
+            addFavorite, removeFavorite, favorites, loadFavoritesFromStorage, saveFavoritesToStorage,
+            playFavorite, fetchLyrics, applyManualLyrics, openLocalFile, seekTo, seekBy, togglePlay,
+            getCurrentTime, getDuration
         };
 
         updateHeartState();
