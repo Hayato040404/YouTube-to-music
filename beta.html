@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>Immersive Music Player — Favorites Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
@@ -26,21 +27,28 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+        /* ── Apple Music 風ライブ歌詞 ── */
         .lyric-line {
-            transition: all 0.5s cubic-bezier(0.2,0.8,0.2,1);
+            transition: opacity 0.45s cubic-bezier(0.2,0.8,0.2,1), transform 0.45s cubic-bezier(0.2,0.8,0.2,1), filter 0.45s cubic-bezier(0.2,0.8,0.2,1);
             transform-origin: left center;
-            opacity: 0.4;
-            transform: scale(var(--inactive-scale));
-            filter: blur(var(--blur-amount));
+            opacity: 0.3;
+            transform: scale(0.9);
+            filter: blur(2px);
             cursor: pointer;
-            padding: 10px 0;
+            padding: 8px 0;
             border-radius: 8px;
             -webkit-tap-highlight-color: transparent;
+            will-change: transform, opacity;
+        }
+        .lyric-line[data-dist="1"], .lyric-line[data-dist="-1"] {
+            opacity: 0.6;
+            transform: scale(0.97);
+            filter: blur(0.5px);
         }
         .lyric-line:active { background: rgba(255,255,255,0.1); }
         .lyric-line.active {
-            opacity:1; transform: scale(var(--active-scale)); filter: blur(0);
-            text-shadow: 0 0 20px rgba(255,255,255,0.5); color: #fff;
+            opacity: 1; transform: scale(1.06); filter: blur(0);
+            color: #fff;
         }
 
         /* ── 1文字同期（カラオケ） ── */
@@ -48,7 +56,7 @@
             display: inline-block;
             transition: opacity 0.08s linear;
         }
-        .lyric-char.char-pending { opacity: 0.3; }
+        .lyric-char.char-pending { opacity: 0.35; }
         .lyric-line.active .lyric-char.char-active {
             opacity: 1;
             text-shadow: 0 0 14px rgba(255,255,255,0.55);
@@ -76,6 +84,45 @@
         .fullscreen-lyrics .lyrics-mask {
             mask-image: linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%);
             -webkit-mask-image: linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%);
+        }
+        /* フルスクリーン時の背景アート演出 */
+        .fullscreen-lyrics #bg-image {
+            transform: scale(1.15) !important;
+            opacity: 0.85 !important;
+            transition: transform 1.2s ease, opacity 1.2s ease;
+        }
+        .fullscreen-lyrics #bg-layer .absolute { background: rgba(0,0,0,0.65) !important; }
+        .fullscreen-lyrics .lyric-line { padding: 14px 0; }
+        .fullscreen-lyrics .lyric-line.active { transform: scale(1.12); }
+        /* フルスクリーン時はヘッダの検索等は最小化（歌詞ボタンのみ明示） */
+        .fullscreen-lyrics #btn-local-file,
+        .fullscreen-lyrics #btn-lyrics-input,
+        .fullscreen-lyrics #btn-open-favs,
+        .fullscreen-lyrics button[onclick="openModal()"] {
+            opacity: 0; pointer-events: none; transform: translateY(-8px);
+            transition: all 0.3s ease;
+        }
+        .fullscreen-lyrics #btn-toggle-lyrics {
+            background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.2);
+        }
+
+        /* モバイル最適化 */
+        @media (max-width: 767px) {
+            .lyrics-mask {
+                mask-image: linear-gradient(to bottom, transparent 3%, black 12%, black 88%, transparent 97%);
+                -webkit-mask-image: linear-gradient(to bottom, transparent 3%, black 12%, black 88%, transparent 97%);
+            }
+            .lyric-line { padding: 6px 0; }
+            #main-layout { padding: 4px 12px 8px; gap: 8px; }
+            .player-section { min-height: 0 !important; }
+            #lyrics-section { height: 38vh !important; }
+        }
+        @media (max-width: 767px) and (max-height: 700px) {
+            #lyrics-section { height: 30vh !important; }
+        }
+        /* 縦に長いモバイル画面では歌詞を広めに */
+        @media (max-width: 767px) and (min-height: 800px) {
+            #lyrics-section { height: 46vh !important; }
         }
 
         input[type=range] { -webkit-appearance:none; background:transparent; }
@@ -207,6 +254,10 @@
 
         <!-- 右歌詞 -->
         <div id="lyrics-section" class="lyrics-section flex-1 w-full h-[40vh] md:h-[85vh] lyrics-mask relative transition-all duration-500">
+            <div id="fullscreen-title" class="hidden absolute top-6 left-1/2 -translate-x-1/2 z-10 text-center pointer-events-none w-full px-4">
+                <div id="fs-title-text" class="text-xl md:text-2xl font-bold truncate">Music Player</div>
+                <div id="fs-artist-text" class="text-sm text-white/60 font-medium truncate">Select a song</div>
+            </div>
             <div id="lyrics-container" class="w-full h-full overflow-y-auto no-scrollbar scroll-smooth py-[50%] md:py-[40vh] px-4 text-left">
                 <div class="text-center text-white/30 text-xl font-bold mt-10">
                     <i class="fas fa-music mb-4 text-3xl block"></i>
@@ -324,6 +375,9 @@
             lyricsSection: document.getElementById('lyrics-section'),
             lyricsContainer: document.getElementById('lyrics-container'),
             lyricsControls: document.getElementById('lyrics-controls'),
+            fullscreenTitle: document.getElementById('fullscreen-title'),
+            fsTitle: document.getElementById('fs-title-text'),
+            fsArtist: document.getElementById('fs-artist-text'),
             toggleBtn: document.getElementById('btn-toggle-lyrics'),
             bgImage: document.getElementById('bg-image'),
             albumArt: document.getElementById('album-art'),
@@ -370,6 +424,9 @@
             if (isLyricsMode) {
                 document.body.classList.add('fullscreen-lyrics');
                 els.lyricsControls.classList.remove('hidden');
+                els.fullscreenTitle.classList.remove('hidden');
+                els.fsTitle.textContent = els.title.textContent;
+                els.fsArtist.textContent = els.artist.textContent;
                 icon.classList.remove('fa-expand-alt');
                 icon.classList.add('fa-compress-alt');
                 setTimeout(() => {
@@ -379,6 +436,7 @@
             } else {
                 document.body.classList.remove('fullscreen-lyrics');
                 els.lyricsControls.classList.add('hidden');
+                els.fullscreenTitle.classList.add('hidden');
                 icon.classList.remove('fa-compress-alt');
                 icon.classList.add('fa-expand-alt');
             }
@@ -771,6 +829,7 @@
                     els.artist.textContent = hit.artistName || els.artist.textContent;
                     currentSong.title = hit.trackName;
                     currentSong.artist = hit.artistName || currentSong.artist;
+                    updateFullscreenTitle();
                 }
 
                 if (text) {
@@ -943,12 +1002,16 @@
             }
 
             if (idx !== currentLineIndex) {
+                // Apple Music 風: 近接行の data-dist を更新（前後1行のみ中間強調）
                 if (currentLineIndex >= 0 && currentLineIndex < lyricRows.length) {
                     lyricRows[currentLineIndex].classList.remove('active');
                 }
+                for (const row of lyricRows) row.removeAttribute('data-dist');
                 currentLineIndex = idx;
                 if (idx >= 0 && idx < lyricRows.length) {
                     lyricRows[idx].classList.add('active');
+                    if (idx - 1 >= 0) lyricRows[idx - 1].setAttribute('data-dist', '1');
+                    if (idx + 1 < lyricRows.length) lyricRows[idx + 1].setAttribute('data-dist', '1');
                     scrollToActiveLine(lyricRows[idx]);
                 }
             }
@@ -1226,6 +1289,7 @@
             currentSong = { videoId: null, title, artist, thumb: null, localKey: file.name };
             els.title.textContent = title;
             els.artist.textContent = artist || 'Local file';
+            updateFullscreenTitle();
             updateHeartState();
             closeModal();
             closeFavs();
@@ -1359,7 +1423,16 @@
             els.title.textContent = currentSong.title || 'Music Player';
             els.artist.textContent = currentSong.artist || 'Select a song';
             if (currentSong.thumb) { els.albumArt.src = currentSong.thumb; els.bgImage.src = currentSong.thumb; }
+            updateFullscreenTitle();
             updateHeartState();
+        }
+
+        // フルスクリーン歌詞モード中のタイトル表示を同期
+        function updateFullscreenTitle() {
+            if (isLyricsMode) {
+                els.fsTitle.textContent = els.title.textContent;
+                els.fsArtist.textContent = els.artist.textContent;
+            }
         }
 
         // keyboard esc
